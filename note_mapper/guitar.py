@@ -3,8 +3,7 @@ from .image import Canvas
 
 
 class Note:
-    """ Note - object representing a musical note
-    """
+    """Object representing a musical note"""
     def __init__(self, name):
         self.name = name
 
@@ -13,20 +12,7 @@ class Note:
 
 
 class String:
-    """ String - object representing a guitar string
-
-    Attributes:
-      name: name of the string
-      note_count: count of notes playable on string
-      note_names: list of note names present on a guitar string, in order
-      height: thickness of line used to represent string horizontally
-      coords: cartesian coordinates to use when drawing the string
-      notes: tuple containing note sequence of string, starting at open note
-
-    Methods:
-      build_string_notes(): build notes tuple
-      get_next_note_idx(note_idx): get index of next note in note sequence
-    """
+    """Object representing a guitar string"""
     note_names = (
         'A', 'A#/B♭', 'B', 'C',
         'C#/D♭', 'D', 'D#/E♭', 'E',
@@ -35,11 +21,16 @@ class String:
     coords = None
 
     def __init__(self, name, note_count):
+        """Initialize String object. Available arguments:
+            - name: name of string
+            - note_count: count of notes to track on string
+        """
         self.name = name
         self.note_count = note_count
         self.build_string_notes()
 
     def build_string_notes(self):
+        """Build note sequence tuple for string"""
         open_note = self.name
         string_notes = [Note(open_note)]
         current_note_idx = list(self.note_names).index(open_note)
@@ -51,38 +42,26 @@ class String:
         self.notes = tuple(string_notes)
 
     def get_next_note_idx(self, note_idx):
+        """Get index of next note in note sequence"""
         return note_idx + 1 if len(self.note_names) > note_idx + 1 else 0
 
     def __repr__(self):
+        """Return text map of notes"""
         return ', '.join(map(str, self.notes))
 
 
 class Neck:
-    """ Neck - object representing the neck of a guitar
-
-    Attributes:
-      length: length of neck in inches
-      nut_width: width of nut in inches
-      fret_count: count of frets on the fret board
-      scale: overall scale of canvas units
-      ppi: number of pixels per inch for use in conversions
-      strings: list of String objects
-      gap_count: count of gaps between strings
-      canvas: canvas element used for drawing
-
-    Methods:
-      draw_image(): execute routine to draw elements on self.image
-      new_image(): create default self.image object
-      reduce_canvas_height(px): subtract canvas.height by px, regen margins/padding
-      update_canvas_padding(t,r,b,l): update padding in canvas object and call update_image()
-      update_canvas_margins(t,r,b,l): update margins in canvas object and call update_image()
-      update_image(): generate string heights/coords and draw image
-      update_string_coords(): calculate and store string drawing coordinates
-      update_string_heights(): calculate and update string and gap heights for use in drawing
-    """
+    """Object representing the neck of a guitar"""
     string_names = ('E', 'B', 'G', 'D', 'A', 'E')
 
     def __init__(self, **kwargs):
+        """Initialize Neck object. Available arguments:
+            - length: length of neck (inches)
+            - nut_width: width of neck at nut (inches)
+            - fret_count: count of frets on neck
+            - scale: overall scale of components
+            - ppi: count of pixels per inch
+        """
         # Assign kwargs and set defaults
         self.length = kwargs['length'] if 'length' in kwargs else 25.5
         self.nut_width = kwargs['nut_width'] if 'nut_width' in kwargs else 1.89
@@ -101,6 +80,7 @@ class Neck:
         self.update_image()
 
     def draw_image(self):
+        """Draw elements to the image"""
         draw = ImageDraw.Draw(self.image)
 
         # Draw strings
@@ -112,44 +92,58 @@ class Neck:
         nut_start_pos_y = self.canvas.padding_top
         nut_end_pos_x = nut_start_pos_x + (self.strings[0].height * 3)
         nut_end_pos_y = self.canvas.height - nut_start_pos_y
-        nut_coords = (nut_start_pos_x, nut_start_pos_y, nut_end_pos_x, nut_end_pos_y)
+        nut_coords = (
+            nut_start_pos_x,
+            nut_start_pos_y,
+            nut_end_pos_x,
+            nut_end_pos_y)
         draw.rectangle(nut_coords, fill='#000')
 
-        # Cap end
-        cap_start_pos_x = self.canvas.width - (self.canvas.padding_right + self.strings[0].height)
+        # Draw end cap
+        cap_start_pos_x = self.canvas.width - (self.canvas.padding_right +
+                                               self.strings[0].height)
         cap_start_pos_y = self.canvas.padding_top
         cap_end_pos_x = cap_start_pos_x + self.strings[0].height
         cap_end_pos_y = self.canvas.height - cap_start_pos_y
-        cap_coords = (cap_start_pos_x, cap_start_pos_y, cap_end_pos_x, cap_end_pos_y)
+        cap_coords = (
+            cap_start_pos_x,
+            cap_start_pos_y,
+            cap_end_pos_x,
+            cap_end_pos_y)
         draw.rectangle(cap_coords, fill='#000')
 
     def new_image(self):
+        """Create a new blank self.image"""
         self.image = Image.new(
             'RGB',
             (self.canvas.width, self.canvas.height),
             '#FFF')
 
     def reduce_canvas_height(self, px):
+        """Reduce self.canvas.height by px, then recalculate padding/margins"""
         self.canvas.height -= px
         self.canvas.set_padding(*self.canvas.padding)
         self.canvas.set_margins(*self.canvas.margins)
 
     def update_canvas_padding(self, top, right, bottom, left):
+        """Update canvas padding and refresh image"""
         self.canvas.set_padding(top, right, bottom, left)
         self.update_image()
 
     def update_canvas_margins(self, top, right, bottom, left):
+        """Update canvas margins and refresh image"""
         self.canvas.set_margins(top, right, bottom, left)
         self.update_image()
 
     def update_image(self):
+        """Update dynamic values and redraw image"""
         self.update_string_heights()
         self.update_string_coords()
         self.new_image()
         self.draw_image()
 
     def update_string_coords(self):
-        origin = (self.canvas.padding_left, self.canvas.padding_top)
+        """Calculate and update self.strings[*].coords for use in drawing"""
         start_pos_x = self.canvas.padding_left
         start_pos_y = self.canvas.padding_top
         for string in self.strings:
@@ -159,8 +153,7 @@ class Neck:
             start_pos_y = start_pos_y + string.height + self.gap_height
 
     def update_string_heights(self, gap_bias=.90):
-        """ Calculate and update string and gap heights for use in drawing
-        """
+        """Calculate and update string and gap heights for use in drawing"""
         height_allowance = self.canvas.height_padded
         self.gap_height = int((height_allowance * gap_bias) / self.gap_count)
         height_allowance -= self.gap_height * self.gap_count
@@ -173,4 +166,5 @@ class Neck:
             self.update_image()
 
     def __repr__(self):
+        """Return text map of strings:notes"""
         return '\n'.join(map(str, self.strings))

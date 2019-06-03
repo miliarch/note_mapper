@@ -14,7 +14,7 @@ def main():
     canvas_width += guitar_neck.canvas.margin_left
     canvas_width += guitar_neck.canvas.margin_right
     canvas = Canvas(canvas_width, 1024)
-    
+
     image = Image.new('RGB', (canvas.width, canvas.height), '#FFF')
     image.paste(guitar_neck.image, box=guitar_neck.canvas.image_box)
     image.show()
