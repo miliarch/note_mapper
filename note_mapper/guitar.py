@@ -1,169 +1,249 @@
-from PIL import Image, ImageDraw
-from .image import Canvas
+""" guitar - collection of classes and functions used to represent and
+reconfigure component parts of a guitar
+"""
+from copy import deepcopy
 
 
 class Note:
     """Object representing a musical note"""
-    def __init__(self, name):
-        self.name = name
+    notes_all = ('A', 'B', 'C', 'D', 'E', 'F', 'G')
+    notes_sharp = ('A', 'C', 'D', 'F', 'G')
+    notes_flat = ('B', 'D', 'E', 'G', 'A')
+
+    def __init__(self, name, sharp=False, flat=False):
+        if len(name) > 1:
+            # Convert note as it includes notation
+            converted_note = self.convert_thick_note(name)
+            self.name = converted_note[0]
+            self.sharp = converted_note[1]
+            self.flat = converted_note[2]
+        else:
+            # Initialize as normal
+            self.name = name
+            self.sharp = sharp
+            self.flat = flat
+
+    def _get_next_note_down(self):
+        """Return next note name down the sequence"""
+        note_idx = self.notes_all.index(self.name)
+        try:
+            next_note_idx = note_idx - 1
+            next_note = self.notes_all[next_note_idx]
+        except IndexError:
+            next_note_idx = -1
+            next_note = self.notes_all[next_note_idx]
+        return next_note
+
+    def _get_next_note_up(self):
+        """Return next note name up the sequence"""
+        note_idx = self.notes_all.index(self.name)
+        try:
+            next_note_idx = note_idx + 1
+            next_note = self.notes_all[next_note_idx]
+        except IndexError:
+            next_note_idx = 0
+            next_note = self.notes_all[next_note_idx]
+        return next_note
+
+    def convert_thick_note(self, note):
+        """Check input note str for length. If > 1, assume note name includes
+        notation at index 1 (♯/♭), verify, and return tuple of
+        (note str, sharp bool, flat bool)
+        """
+        sharp = False
+        flat = False
+        if len(note) > 1:
+            if note[1] == '♯':
+                sharp = True
+            elif note[1] == '♭':
+                flat = True
+            note = note[0]
+
+        return (note, sharp, flat)
+
+    def convert_to_flat(self):
+        """Convert note to flat"""
+        if not self.sharp and not self.flat and self.name in self.notes_flat:
+            # Convert unmodified note to flat if it can be
+            self.sharp = False
+            self.flat = True
+        elif self.sharp:
+            # Convert sharp to flat (next flat note up + attributes to ♭)
+            self.name = self._get_next_note_up()
+            self.sharp = False
+            self.flat = True
+
+    def convert_to_sharp(self):
+        """Convert note to sharp"""
+        if not self.flat and not self.sharp and self.name in self.notes_sharp:
+            # Convert unmodified note to sharp if it can be
+            self.sharp = True
+            self.flat = False
+        elif self.flat:
+            # Convert flat to sharp (next note down + attributes to ♯)
+            self.name = self._get_next_note_down()
+            self.sharp = True
+            self.flat = False
+
+    def decrement(self):
+        """Decrement note to next note down the scale"""
+        next_note = self._get_next_note_down()
+        flat_valid = True if self.name in self.notes_flat else False
+        sharp_valid = True if next_note in self.notes_sharp else False
+        if not self.sharp and not self.flat:
+            if flat_valid:
+                self.flat = True
+            elif sharp_valid:
+                self.name = next_note
+                self.flat = False
+                self.sharp = True
+            else:
+                self.name = next_note
+        elif self.flat and sharp_valid:
+            self.name = next_note
+            self.flat = False
+            self.sharp = True
+        elif self.flat:
+            self.name = next_note
+            self.flat = False
+        elif self.sharp:
+            self.sharp = False
+
+    def increment(self):
+        """Increment note to next note up the scale"""
+        next_note = self._get_next_note_up()
+        sharp_valid = True if self.name in self.notes_sharp else False
+        flat_valid = True if next_note in self.notes_flat else False
+        if not self.sharp and not self.flat:
+            if sharp_valid:
+                self.sharp = True
+            elif flat_valid:
+                self.name = next_note
+                self.sharp = False
+                self.flat = True
+            else:
+                self.name = next_note
+        elif self.sharp and flat_valid:
+            self.name = next_note
+            self.sharp = False
+            self.flat = True
+        elif self.sharp:
+            self.name = next_note
+            self.sharp = False
+        elif self.flat:
+            self.flat = False
 
     def __repr__(self):
-        return self.name
+        if self.sharp:
+            return '{n}{s}'.format(n=self.name, s='♯')
+        elif self.flat:
+            return '{n}{s}'.format(n=self.name, s='♭')
+        else:
+            return '{}'.format(self.name)
+
+
+class Fret:
+    """Object representing a fret on a guitar neck"""
+    def __init__(self, string_name, position, notes):
+        """Initialize Fret object. Attributes:
+            - position: fret position on the neck/fretboard
+            - note: primary note played on fret (standard or sharp)
+            - enharmonic: boolean tracking whether fret note represents multiple notes depending on context
+            - enharmonic_note: alternate representation of fret note (flat)
+        """
+        self.string_name = string_name
+        self.position = position
+        self.note = notes[0]
+        self.enharmonic = True if len(notes) > 1 else False
+        self.enharmonic_note = notes[-1] if self.enharmonic else self.note
+
+    def get_note_str(self, sharp=True):
+        """Return string representation of note present in fret"""
+        if sharp:
+            return '{}'.format(self.note)
+        else:
+            return '{}'.format(self.enharmonic_note)
+
+    def __repr__(self):
+        return self.get_note_str()
 
 
 class String:
     """Object representing a guitar string"""
-    note_names = (
-        'A', 'A#/B♭', 'B', 'C',
-        'C#/D♭', 'D', 'D#/E♭', 'E',
-        'F', 'F#/G♭', 'G', 'G#/A♭')
     height = None
     coords = None
 
-    def __init__(self, name, note_count):
-        """Initialize String object. Available arguments:
-            - name: name of string
-            - note_count: count of notes to track on string
+    def __init__(self, name, fret_count):
+        """Initialize String object. Attributes:
+            - name: name of string (synonymous with open note)
+            - fret_count: count of frets to sequence on string
+            - frets: list of Fret objects present on string
         """
         self.name = name
-        self.note_count = note_count
-        self.build_string_notes()
+        self.fret_count = fret_count
+        self.frets = self._generate_frets()
 
-    def build_string_notes(self):
-        """Build note sequence tuple for string"""
-        open_note = self.name
-        string_notes = [Note(open_note)]
-        current_note_idx = list(self.note_names).index(open_note)
-        for i in range(self.note_count):
-            next_note_idx = self.get_next_note_idx(current_note_idx)
-            string_notes.append(Note(self.note_names[next_note_idx]))
-            current_note_idx = next_note_idx
+    def _generate_frets(self):
+        """Generate and return list of Fret objects, starting at string
+        note (self.name), ending after self.fret_count frets
+        """
+        # Pack first fret
+        frets = []
+        open_note = Note(self.name)
+        next_note = deepcopy(open_note)
+        next_note.increment()
+        fret_notes = self._pack_fret_note_list(open_note, next_note)
+        frets.append(Fret(self.name, 0, fret_notes))
 
-        self.notes = tuple(string_notes)
+        # Pack remaining frets
+        for i in range(self.fret_count):
+            current_note = deepcopy(fret_notes[-1])
+            current_note.increment()
+            next_note = deepcopy(current_note)
+            next_note.increment()
+            fret_notes = self._pack_fret_note_list(current_note, next_note)
+            frets.append(Fret(self.name, i + 1, fret_notes))
 
-    def get_next_note_idx(self, note_idx):
-        """Get index of next note in note sequence"""
-        return note_idx + 1 if len(self.note_names) > note_idx + 1 else 0
+        return frets
+
+    def _pack_fret_note_list(self, current_note, next_note):
+        if current_note.sharp and next_note.flat:
+            return [current_note, next_note]
+        else:
+            return [current_note]
+
+    def get_fret_notes(self, sharp=True):
+        fret_notes = []
+        for fret in self.frets:
+            if sharp:
+                fret_notes.append(fret.get_note_str(sharp=True))
+            else:
+                fret_notes.append(fret.get_note_str(sharp=False))
+        return fret_notes
 
     def __repr__(self):
         """Return text map of notes"""
-        return ', '.join(map(str, self.notes))
+        return ', '.join(map(str, self.get_fret_notes(sharps=True)))
 
 
 class Neck:
     """Object representing the neck of a guitar"""
-    string_names = ('E', 'B', 'G', 'D', 'A', 'E')
-
-    def __init__(self, **kwargs):
-        """Initialize Neck object. Available arguments:
+    def __init__(self, length=25.25, nut_width=1.89, fret_count=21,
+                 string_note_sequence=('E', 'B', 'G', 'D', 'A', 'E')):
+        """Initialize Neck object. Attributes:
             - length: length of neck (inches)
             - nut_width: width of neck at nut (inches)
             - fret_count: count of frets on neck
-            - scale: overall scale of components
-            - ppi: count of pixels per inch
+            - string_note_sequence: tuple of open notes on each string (high to low)
+            - strings: list of String objects
         """
-        # Assign kwargs and set defaults
-        self.length = kwargs['length'] if 'length' in kwargs else 25.5
-        self.nut_width = kwargs['nut_width'] if 'nut_width' in kwargs else 1.89
-        self.fret_count = kwargs['fret_count'] if 'fret_count' in kwargs else 21
-        self.scale = kwargs['scale'] if 'scale' in kwargs else 1
-        self.ppi = kwargs['ppi'] if 'ppi' in kwargs else 75
-        self.strings = [String(name, self.fret_count) for name in self.string_names]
-        self.gap_count = len(self.strings) - 1
-
-        # Init canvas
-        width_px = int((self.length * self.ppi) * self.scale)
-        height_px = int((self.nut_width * self.ppi) * self.scale)
-        self.canvas = Canvas(width_px, height_px)
-
-        # Update image
-        self.update_image()
-
-    def draw_image(self):
-        """Draw elements to the image"""
-        draw = ImageDraw.Draw(self.image)
-
-        # Draw strings
-        for string in self.strings:
-            draw.rectangle(string.coords, fill='#000')
-
-        # Draw nut
-        nut_start_pos_x = self.canvas.padding_left
-        nut_start_pos_y = self.canvas.padding_top
-        nut_end_pos_x = nut_start_pos_x + (self.strings[0].height * 3)
-        nut_end_pos_y = self.canvas.height - nut_start_pos_y
-        nut_coords = (
-            nut_start_pos_x,
-            nut_start_pos_y,
-            nut_end_pos_x,
-            nut_end_pos_y)
-        draw.rectangle(nut_coords, fill='#000')
-
-        # Draw end cap
-        cap_start_pos_x = self.canvas.width - (self.canvas.padding_right +
-                                               self.strings[0].height)
-        cap_start_pos_y = self.canvas.padding_top
-        cap_end_pos_x = cap_start_pos_x + self.strings[0].height
-        cap_end_pos_y = self.canvas.height - cap_start_pos_y
-        cap_coords = (
-            cap_start_pos_x,
-            cap_start_pos_y,
-            cap_end_pos_x,
-            cap_end_pos_y)
-        draw.rectangle(cap_coords, fill='#000')
-
-    def new_image(self):
-        """Create a new blank self.image"""
-        self.image = Image.new(
-            'RGB',
-            (self.canvas.width, self.canvas.height),
-            '#FFF')
-
-    def reduce_canvas_height(self, px):
-        """Reduce self.canvas.height by px, then recalculate padding/margins"""
-        self.canvas.height -= px
-        self.canvas.set_padding(*self.canvas.padding)
-        self.canvas.set_margins(*self.canvas.margins)
-
-    def update_canvas_padding(self, top, right, bottom, left):
-        """Update canvas padding and refresh image"""
-        self.canvas.set_padding(top, right, bottom, left)
-        self.update_image()
-
-    def update_canvas_margins(self, top, right, bottom, left):
-        """Update canvas margins and refresh image"""
-        self.canvas.set_margins(top, right, bottom, left)
-        self.update_image()
-
-    def update_image(self):
-        """Update dynamic values and redraw image"""
-        self.update_string_heights()
-        self.update_string_coords()
-        self.new_image()
-        self.draw_image()
-
-    def update_string_coords(self):
-        """Calculate and update self.strings[*].coords for use in drawing"""
-        start_pos_x = self.canvas.padding_left
-        start_pos_y = self.canvas.padding_top
-        for string in self.strings:
-            end_pos_x = self.canvas.width - self.canvas.padding_right
-            end_pos_y = start_pos_y + string.height
-            string.coords = (start_pos_x, start_pos_y, end_pos_x, end_pos_y)
-            start_pos_y = start_pos_y + string.height + self.gap_height
-
-    def update_string_heights(self, gap_bias=.90):
-        """Calculate and update string and gap heights for use in drawing"""
-        height_allowance = self.canvas.height_padded
-        self.gap_height = int((height_allowance * gap_bias) / self.gap_count)
-        height_allowance -= self.gap_height * self.gap_count
-        for string in self.strings:
-            string.height = int(height_allowance / len(self.strings))
-        height_allowance -= self.strings[0].height * len(self.strings)
-        if height_allowance != 0:
-            # Adjust canvas to achieve perfect fit and restart at update_image
-            self.reduce_canvas_height(height_allowance)
-            self.update_image()
+        self.length = length
+        self.nut_width = nut_width
+        self.fret_count = fret_count
+        self.string_note_sequence = string_note_sequence
+        self.strings = []
+        for note_name in self.string_note_sequence:
+            self.strings.append(String(note_name, self.fret_count))
 
     def __repr__(self):
         """Return text map of strings:notes"""
