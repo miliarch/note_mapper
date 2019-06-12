@@ -212,10 +212,10 @@ class String:
         else:
             return [current_note]
 
-    def get_fret_notes(self, sharp=True):
+    def get_fret_notes(self, sharps=True):
         fret_notes = []
         for fret in self.frets:
-            if sharp:
+            if sharps:
                 fret_notes.append(fret.get_note_str(sharp=True))
             else:
                 fret_notes.append(fret.get_note_str(sharp=False))
