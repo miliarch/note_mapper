@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import common
 from note_mapper.guitar import Neck
 
 TESTS = []
