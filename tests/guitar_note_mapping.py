@@ -44,8 +44,8 @@ def main():
         string_notes_sharp = []
         string_notes_flat = []
         for string in guitar_neck.strings:
-            sharps = ', '.join(map(str, string.get_fret_notes(sharp=True)))
-            flats = ', '.join(map(str, string.get_fret_notes(sharp=False)))
+            sharps = ', '.join(map(str, string.get_fret_notes(sharps=True)))
+            flats = ', '.join(map(str, string.get_fret_notes(sharps=False)))
             string_notes_sharp.append(sharps)
             string_notes_flat.append(flats)
         string_note_map_sharp = '\n'.join(map(str, string_notes_sharp))
