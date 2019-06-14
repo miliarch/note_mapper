@@ -1,9 +1,6 @@
 """ guitar - collection of classes and functions used to represent and
 reconfigure component parts of a guitar
 """
-from copy import deepcopy
-
-
 class Note:
     """Object representing a musical note"""
     notes_all = ('A', 'B', 'C', 'D', 'E', 'F', 'G')
@@ -190,16 +187,16 @@ class String:
         # Pack first fret
         frets = []
         open_note = Note(self.name)
-        next_note = deepcopy(open_note)
+        next_note = Note(open_note.name, open_note.sharp, open_note.flat)
         next_note.increment()
         fret_notes = self._pack_fret_note_list(open_note, next_note)
         frets.append(Fret(self.name, 0, fret_notes))
 
         # Pack remaining frets
         for i in range(self.fret_count):
-            current_note = deepcopy(fret_notes[-1])
+            current_note = Note(fret_notes[-1].name, fret_notes[-1].sharp, fret_notes[-1].flat)
             current_note.increment()
-            next_note = deepcopy(current_note)
+            next_note = Note(current_note.name, current_note.sharp, current_note.flat)
             next_note.increment()
             fret_notes = self._pack_fret_note_list(current_note, next_note)
             frets.append(Fret(self.name, i + 1, fret_notes))
